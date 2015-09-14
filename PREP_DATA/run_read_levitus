@@ -1,0 +1,132 @@
+#
+# simple script to read the levitus data on a workstation
+# note this levitus data is on a local workstation disk rather than
+# on the archive. all data if unformatted 32bit ieee
+# author:  R.C.Pacanowski      e-mail: rcp@gfdl.gov
+#
+set datainpath   = /net/rcp/DATABASE
+
+cat > test.F << CODE
+      program test
+      parameter (imd=362, jmd=180, kd=33, lenw=imd*20)
+      character*32 stamp
+      character*80 iotext
+c
+c     lons = number of longitudes
+c     lats = number of latitudes
+c     cx = longitude coordinates
+c     cy = latitude coordinates
+c     depth = depth of level
+c     dd  = depths of all levels
+c     data = the data
+c
+      common /bigone/ lons, lats, depth, cx(imd), cy(jmd)
+      common /bigone/ dd(kd), data(imd,jmd)
+c
+      character*26 tempin, saltin
+      character*40 levmask
+      dimension tempin(13), saltin(13)
+      dimension iotin(13), iosin(13)
+c
+      data tempin /
+     &               '/net/rcp/DATABASE/jan.temp'
+     &,              '/net/rcp/DATABASE/feb.temp'
+     &,              '/net/rcp/DATABASE/mar.temp'
+     &,              '/net/rcp/DATABASE/apr.temp'
+     &,              '/net/rcp/DATABASE/may.temp'
+     &,              '/net/rcp/DATABASE/jun.temp'
+     &,              '/net/rcp/DATABASE/jul.temp'
+     &,              '/net/rcp/DATABASE/aug.temp'
+     &,              '/net/rcp/DATABASE/sep.temp'
+     &,              '/net/rcp/DATABASE/oct.temp'
+     &,              '/net/rcp/DATABASE/nov.temp'
+     &,              '/net/rcp/DATABASE/dec.temp'
+     &,              '/net/rcp/DATABASE/ann.temp' /
+c
+      data saltin /
+     &               '/net/rcp/DATABASE/jan.salt'
+     &,              '/net/rcp/DATABASE/feb.salt'
+     &,              '/net/rcp/DATABASE/mar.salt'
+     &,              '/net/rcp/DATABASE/apr.salt'
+     &,              '/net/rcp/DATABASE/may.salt'
+     &,              '/net/rcp/DATABASE/jun.salt'
+     &,              '/net/rcp/DATABASE/jul.salt'
+     &,              '/net/rcp/DATABASE/aug.salt'
+     &,              '/net/rcp/DATABASE/sep.salt'
+     &,              '/net/rcp/DATABASE/oct.salt'
+     &,              '/net/rcp/DATABASE/nov.salt'
+     &,              '/net/rcp/DATABASE/dec.salt'
+     &,              '/net/rcp/DATABASE/ann.salt' /
+c
+      data levmask /
+     &               '/net/rcp/DATABASE/levitus.mask' /
+c
+c     Read in the land sea mask for the levitus dataset
+c     There are "kd" levels for the land sea mask, where
+c     sea = 1.0, land=0.0
+c
+c     author: Bonnie Samuels    bls@gfdl.gov
+c
+      open (10,file=levmask, FORM='unformatted'
+     &,       access='sequential')
+      rewind 10
+      do k=1,kd
+        read(10) iotext
+	print *, iotext
+        read(10) lons, lats, kk, k, cx, cy, dd, data
+        print *,' read landsea mask: lons=',lons,' lats=',lats,
+     &  ' # of levels=',kk,' k=',k
+        do j=1,jmd
+          do i=1,imd
+           imask(i,j)=data(i,j)
+          enddo
+        enddo
+        print *,'lat,lon=',cy(21),cx(2),'imask(2,21)=',imask(2,21)
+      enddo
+c
+      nummon = 2
+c      nummon = 13
+      do n=1,nummon
+        iotin(n) = 10+n
+        open (iotin(n), file=tempin(n), FORM='unformatted'
+     &,       access='sequential')
+      enddo
+c
+c     there are 19 levels for monthly temperatures
+c     there are "kd" levels for annual temperatures
+c     month = 1 is january...month = 12 is december, 13=annual mean
+c
+      do n=1,nummon
+        rewind iotin(n)
+        if (n .le. 12) then
+          numlev = 19
+        else
+          numlev = kd
+        endif
+        do k=1,numlev
+c
+c         read in Levitus data at standard level k this way:
+c          (the first record is a character string stating what the
+c           data is)
+          read (iotin(n)) iotext
+          read (iotin(n)) stamp, dpm, lons, lats, kk, kl, nn, cx
+     &,                   cy, dd, data
+          print *,' read levitus data for stamp=',stamp
+     &, ' dpm=',dpm, ' lons=',lons,' lats=',lats
+     &, ' # of levels=',kk, ' k=',kl
+     &  ,' month=',nn
+        enddo
+      enddo
+c
+c     there are 24 levels for monthly salinity
+c     there are "kd" levels for annual salinity
+c     month = 1 is january...month = 12 is december, 13=annual mean
+c     read it similarly to temperature
+c
+      stop
+      end
+CODE
+
+f77 test.F
+a.out
+

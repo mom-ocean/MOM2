@@ -1,0 +1,79 @@
+#
+echo " "
+echo "             SGI Source Code Merge Utility"
+echo " "
+echo "Enter directory path of the original (base) code:"
+set trunk1=($<)
+echo "Enter directory path of one of the devolopment branches:"
+set branch1=($<)
+echo "Enter directory path of the other development branches:"
+set branch2=($<)
+echo "Enter directory path for the new (updated) code:"
+set trunk2=($<)
+
+if (!(-d $trunk2)) then
+  mkdir $trunk2
+else
+  if ("$trunk2" == "$trunk1") then
+    echo " directory for updated code should not be the same as the base directory" 
+    exit
+  endif
+endif
+
+if (!(-d $branch1)) then
+  echo " branch directory $branch1 does not exist."
+  exit
+endif
+
+if (!(-d $branch2)) then
+  echo " branch directory $branch2 does not exist."
+  exit
+endif
+
+echo " ==> building the list of changed files ..."
+mkdir TEMPUPDATElist
+cp $branch1/*.[Ffh] TEMPUPDATElist
+cp $branch2/*.[Ffh] TEMPUPDATElist
+cd TEMPUPDATElist
+set list = `ls`
+cd ../
+rm -r TEMPUPDATElist
+
+echo "  file list = $list"
+echo ' '
+foreach file ($list)
+  set file1 = $branch1/$file
+  set file2 = $trunk1/$file
+  set file3 = $branch2/$file
+  set file4 = $trunk2/$file
+  echo " "
+  echo "==> working on $file ..."
+  if (-e $file1 && -e $file3) then
+    if (-e $file2) then
+      echo "$file exits in $trunk1, $branch1 and $branch2"
+      merge -p $file1 $file2 $file3 > $file4
+    else
+      echo "$file exits only in $branch1 and $branch2"
+      merge -p $file1 $file1 $file3 > $file4
+    endif
+  endif
+  if (!(-e $file1) && -e $file3) then
+    if (-e $file2) then
+      echo "$file exits in $trunk1 and $branch2"
+      merge -p $file3 $file2 $file3 > $file4
+    else
+      echo "$file only exits in $branch2 ... copying to $file4"
+      cp $file3 $file4
+    endif
+  endif
+  if (-e $file1 && !(-e $file3)) then
+    if (-e $file2) then
+      echo "$file exits in $trunk1 and $branch1"
+      merge -p $file1 $file2 $file1 > $file4
+    else
+      echo "$file only exits in $branch1 ... copying to $file4"
+      cp $file1 $file4
+    endif
+  endif
+end
+

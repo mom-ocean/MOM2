@@ -1,0 +1,69 @@
+#
+echo " "
+echo " =>executing: run_ppmix"
+echo " "
+#
+#    script for testing the "ppmix.F" module
+#
+#     options: (must choose only one of these)
+#       -Dread_my_grid    : read in your own grid definition
+#       -Dgenerate_a_grid : generate a grid based on USER INPUT
+#                           in grids.F
+#     optional options:
+#
+#       -Drectangular_box : sets "kmt" to a flat bottom rectangular box
+#       -Dflat_bottom     : sets "kmt" over ocean to maximum levels (km)
+#       -Dcyclic          : sets cyclic conditons in zonal direction
+#
+
+set OPTIONS = '-Dtest_ppmix -Dgenerate_a_grid'
+
+
+set MOM2 = /home/rcp/MOM_2  # base model code
+set WORK = TEMP_DIR         # temp directory
+
+set error = false
+if (! -r ppmix.F) then
+  echo '=>Error: need to have "ppmix.F" in this UPDATES directory'
+  echo '         copy "ppmix.F" to this directory and make modifications here'
+  set error = true
+endif
+
+if (! -r grids.F) then
+  echo '=>Error: need to have "grids.F" in this UPDATES directory'
+  echo '         copy "grids.F" to this directory and make modifications here'
+  set error = true
+endif
+
+if (! -r size.h) then
+  echo '=>Error: need to have "size.h" in this UPDATES directory'
+  echo '         copy "size.F" to this directory'
+  set error = true
+endif
+
+if ("$error" == "true") then
+  exit
+endif
+
+echo "=>Grabbing sources from $MOM2"
+mkdir $WORK
+cd $WORK
+set list = (util.F iomngr.F size_check.F state.F tmngr.F)
+foreach file ($list)
+  echo $file  
+  cp $MOM2/$file .
+end
+cp $MOM2/*.h .
+cp ../ppmix.F .
+cp ../grids.F .
+cp ../size.h .
+
+echo "=>compiling..."
+f77 -P $OPTIONS ppmix.F; f77 ppmix.i
+
+echo "=> running...results are being written to results_ppmix"
+a.out > ../results_ppmix
+echo "Done"
+
+cd ../
+/bin/rm -r $WORK

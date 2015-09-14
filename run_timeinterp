@@ -1,0 +1,37 @@
+#
+echo " "
+echo " =>executing: run_timeinterp"
+echo " "
+#
+#
+# script for testing the "timeinterp.F" module
+#
+
+set OPTIONS = '-Dtest_timeinterp'
+
+set MOM2 = /home/rcp/MOM_2  # base model code
+set WORK = TEMP_DIR         # temp directory
+
+if (! -r timeinterp.F) then
+  echo '=>Error: "timeinterp.F" is not in this UPDATES directory'
+  exit
+endif
+
+echo "=>Grabbing sources from $MOM2"
+mkdir $WORK
+cd $WORK
+set list = (tmngr.F util.F stdunits.h tmngr.h switch.h calendar.h)
+foreach file ($list)
+  cp $MOM2/$file .
+end
+cp ../timeinterp.F .
+
+echo "=>compiling..."
+f77 -P $OPTIONS timeinterp.F; f77 timeinterp.i
+
+echo "=> running...results are being written to results_timeinterp"
+a.out > ../results_timeinterp
+ 
+cd ../
+/bin/rm -r $WORK
+echo "Done"

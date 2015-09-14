@@ -1,0 +1,162 @@
+#
+echo " "
+echo " =>executing: run_topog"
+echo " "
+#
+#     run script for driving the "topog.F" module
+#
+#     options: (must choose only one of these)
+#       -Dscripps_kmt   : interpolate Scripps topography to "kmt"
+#                          on MOM grid
+#       -Didealized_kmt : use the test case idealized "kmt"
+#       -Dread_my_kmt   : import a "kmt"
+#
+#     options: (optional)
+#       -Dwrite_my_kmt  : export a "kmt"
+#
+#     options: (must choose only one of these)
+#       -Dread_my_grid    : read in your own grid definition
+#       -Dgenerate_a_grid : generate a grid based on USER INPUT
+#                           in grids.F
+#     optional options:
+#
+#       -Drectangular_box : sets "kmt" to a flat bottom rectangular box
+#       -Dflat_bottom     : sets "kmt" over ocean to maximum levels (km)
+#       -Dcyclic          : sets cyclic conditons in zonal direction
+#
+
+set DISPLAY_OPTION = ' ' # for batch mode
+#set DISPLAY_OPTION = '-Dascii_display' # ascii editor
+#set DISPLAY_OPTION = '-Dsgi_display'  #gfdl graphics only
+
+
+set INTERACTIVE_OPTION = '-Dinteractive_edit_topography  ' #gfdl graphics only
+if ("$DISPLAY_OPTION" != "-Dascii_display" && "$DISPLAY_OPTION" != "-Dsgi_display") then
+set INTERACTIVE_OPTION = ' ' #no interaction if no display
+endif
+
+ set PROMPT_OPTION = ' '
+#set PROMPT_OPTION = '-Dprompt_shallow -Dprompt_perimeter_violations -Dprompt_nonadvective -Dprompt_potholes' #gfdl graphics only
+if ($INTERACTIVE_OPTION == ' ') then
+ set PROMPT_OPTION = ' ' #no prompts if no interaction
+endif
+
+
+#set TOPOGRAPHY = '-Dscripps_kmt'
+#set TOPOGRAPHY = '-Dread_my_kmt'
+set TOPOGRAPHY = '-Didealized_kmt'
+
+#set OPTIONS = '-Ddrive_topog  -Dgenerate_a_grid'
+set OPTIONS = '-Ddrive_topog  -Dgenerate_a_grid -Dcyclic'
+
+set OTHER_OPTIONS = ' '
+#set OTHER_OPTIONS = ' -Dwrite_my_kmt'
+#set OTHER_OPTIONS = ' -Dskip_interp_details -Dskip_island_map -Dskip_kmt_map '
+
+set ALL_OPTIONS = "$OTHER_OPTIONS $OPTIONS $TOPOGRAPHY $DISPLAY_OPTION $INTERACTIVE_OPTION $PROMPT_OPTION"
+
+echo OPTION LIST: $ALL_OPTIONS
+echo " "
+
+set MOM2 = /home/rcp/MOM_2  # base model code
+set WORK = TEMP_DIR         # temp directory
+
+
+set error = false
+if (! -r grids.F) then
+  echo '=>Error: need to have "grids.F" in this UPDATES directory'
+  echo '         copy "grids.F" to this directory and make modifications here'
+  set error = true
+endif
+
+if (! -r topog.F) then
+  echo '=>Error: need to have "topog.F" in this UPDATES directory'
+  set error = true
+endif
+
+if (! -r size.h) then
+  echo '=>Error: need to have "size.h" in this UPDATES directory'
+  set error = true
+endif
+
+if ("$error" == "true") then
+  exit
+endif
+
+echo "=>Grabbing sources from $MOM2"
+if (-d $WORK) then
+  /bin/rm -r $WORK
+endif
+mkdir $WORK
+cd $WORK
+set list = (stdunits.h coord.h util.F iomngr.F iomngr.h size_check.F topog.h isleperim.F glstuff.F glstuff.h)
+foreach file ($list)
+  echo $file
+  cp $MOM2/$file .
+end
+cp ../grids.F .
+cp ../size.h .
+cp ../topog.F .
+
+set DELTAS = `ls ../delta*`
+if  ("$DELTAS" == "") then
+  echo ' no topographic "delta" files were found... So none to copy'
+else
+  echo ' copying existing topographic "delta" files from this UPDATES directory'
+  cp ../delta* .
+endif
+
+if  (-s kmt.dta) then
+  echo " =>Note: copying kmt.dta from this UPDATES directory"
+  cp ../kmt.dta .
+endif
+
+
+if ("$TOPOGRAPHY" == "-Dscripps_kmt") then
+  set SCRIPPS_PATH = $MOM2
+  if  (! -r $SCRIPPS_PATH/scripps.top) then
+    echo '=>Error: file "scripps.top" could not be found '
+    echo '         when using the scripps_kmt option'
+    echo '         change the SCRIPPS_PATH in run_topog to point to it'
+    exit
+  else
+    echo " copying SCRIPPS topography from $SCRIPPS_PATH/scripps.top"  
+    cp $SCRIPPS_PATH/scripps.top .
+  endif
+endif
+chmod u+w *
+
+
+echo "=>compiling..."
+if ($DISPLAY_OPTION == "-Dsgi_display") then
+  f77 -P $ALL_OPTIONS topog.F; f77 topog.i -lfgl -lgl_s
+else
+  f77 -P $ALL_OPTIONS topog.F; f77 topog.i
+endif
+
+echo "=> running...results are being written to results_topog"
+if ($DISPLAY_OPTION == "-Dascii_display") then
+  a.out
+else
+  a.out > ../results_topog
+endif
+
+set DELTAS = `ls delta*`
+if  ("$DELTAS" == "") then
+  echo ' =>Note: no topographic "delta" files was created'
+else
+  echo " =>Note: Copying $DELTAS to this UPDATES directory"
+  cp delta* ../
+endif
+
+if  (-s kmt.dta) then
+  echo " =>Note: Exporting kmt.dta into this UPDATES directory"
+  cp kmt.dta ../
+else
+  echo ' =>Note: no kmt.dta file was created for export'
+endif
+
+chmod u+w *
+cd ../
+/bin/rm -r $WORK
+   

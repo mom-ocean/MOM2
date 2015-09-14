@@ -1,0 +1,37 @@
+#
+echo " "
+echo " =>executing: run_util"
+echo " "
+#
+#
+# run script for testing the "util.F" module
+#
+
+set OPTIONS = '-Dtest_util'
+
+set MOM2 = /home/rcp/MOM_2  # base model code
+set WORK = TEMP_DIR         # temp directory
+
+if (! -r util.F) then
+  echo '=>Error: "util.F" is not in this UPDATES directory'
+  exit
+endif
+
+echo "=>Grabbing sources from $MOM2"
+mkdir $WORK
+cd $WORK
+set list = (stdunits.h)
+foreach file ($list)
+  cp $MOM2/$file .
+end
+cp ../util.F .
+
+echo "=>compiling..."
+f77 -P $OPTIONS util.F; f77 util.i
+
+echo "=> running...results are being written to results_util"
+a.out > ../results_util
+ 
+cd ../
+/bin/rm -r $WORK
+echo "Done"

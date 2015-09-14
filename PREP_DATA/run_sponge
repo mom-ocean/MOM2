@@ -1,0 +1,80 @@
+#  Cray script for creating sponge layers for MOM_2
+#    author:  R.C. Pacanowski   e-mail: rcp@gfdl.gov
+
+set myEXP       = TEST_CASE 
+set myWHOME     = $WHOME
+set myARCHIVE   = $ARCHIVE
+set MOMupdates  = $myWHOME/MOM_2/EXP/$myEXP/MOM_UPDATES
+set PREPupdates = $myWHOME/MOM_2/EXP/$myEXP/PREP_UPDATES
+
+set MOMpath      = $myWHOME/MOM_2
+set PREPpath     = $MOMpath/PREP_DATA
+set datainpath   = /archive/o/rcp/MOM_2/DATABASE
+set dataoutpath  = $myARCHIVE/MOM_2/EXP/$myEXP
+set printoutpath = $PREPupdates
+set WORKDIR      = $FTMPDIR
+
+""cd $WORKDIR   # change to a working directory
+/bin/rm $WORKDIR/*.[Ffh]
+
+echo " "
+echo " preparing climatological monthly sponge data for MOM"
+echo " "
+
+echo " ==> getting sources for run_sponge..."
+set list = (stdunits.h coord.h grids.F size.h util.F iomngr.F iomngr.h size_check.F)
+foreach file ($list)
+  cp $MOMpath/$file .
+end
+
+/bin/cp $MOMupdates/*.[Ffh] .
+
+/bin/cp $PREPpath/sponge.F .
+
+/bin/cp $PREPupdates/*.[Ffh]  .
+
+setenv NPROC 1
+
+echo " ==> compiling ..."
+
+# USER INPUT: set OPTIONS
+
+#
+#     options: (must choose only one of these)
+#       -Dread_my_grid    : read in your own grid definition
+#       -Dgenerate_a_grid : generate a grid based on USER INPUT
+#                           in grids.F
+#     optional options:
+#
+#       -Drectangular_box : sets "kmt" to a flat bottom rectangular box
+#       -Dflat_bottom     : sets "kmt" over ocean to maximum levels (km)
+#       -Dcyclic          : sets cyclic conditons in zonal direction
+#
+set OPTIONS = '-Dmakesponge -Dcray_ymp -Dgenerate_a_grid -Dcyclic'
+echo OPTIONS = $OPTIONS
+/lib/cpp -P $OPTIONS sponge.F sponge.i 
+cf77 -Zv -o sponge sponge.i
+
+if (!(-r jan.temp.mom && -r jan.salt.mom)) then
+ echo "dmgetting data"
+ dmget $dataoutpath/*.mom 
+ echo "copying data"
+ /bin/cp $dataoutpath/*.mom .
+ /bin/cp $dataoutpath/*.mom .
+else
+ echo "data is assumed to be in $WORKDIR"
+endif
+ 
+rm .assign
+
+echo " ==> executing sponge ... "
+sponge > printout
+
+echo " ===> copying printout to $printoutpath/sponge.prn"
+/bin/cp printout $printoutpath/sponge.prn
+
+echo " ===> copying data files to $dataoutpath/sponge.mom"
+/bin/cp sponge.mom $dataoutpath
+
+echo  " ==> all done == "
+echo ""

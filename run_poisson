@@ -1,0 +1,81 @@
+#
+echo " "
+echo " =>executing: run_poisson"
+echo " "
+#
+#  script for testing the poisson.F module which is set to execute on an
+#  SGI INDIGO under 64bit precision
+#
+#
+#     options: (must choose only one of these)
+#       -Dscripps_kmt   : interpolate Scripps topography to "kmt"
+#                          on MOM grid
+#       -Dread_my_kmt   : read in your own "kmt"
+#       -Didealized_kmt : use the test case idealized "kmt"
+#
+#     options: (must choose only one of these)
+#       -Dread_my_grid    : read in your own grid definition
+#       -Dgenerate_a_grid : generate a grid based on USER INPUT
+#                           in grids.F
+#     optional options:
+#
+#       -Drectangular_box : sets "kmt" to a flat bottom rectangular box
+#       -Dflat_bottom     : sets "kmt" over ocean to maximum levels (km)
+#       -Dcyclic          : sets cyclic conditons in zonal direction
+#
+
+set COMPILER_OPT = '-C -g -trapuv -r8 -align64 -mips2'
+#set OPTIONS = '-Dtest_poisson -Didealized_kmt -Dgenerate_a_grid -Dcyclic -Dtiming -Dcray_ymp'
+set OPTIONS = '-Dtest_poisson -Didealized_kmt -Dgenerate_a_grid -Dcyclic -Dtiming -Dsgi'
+
+set MOM2 = /home/rcp/MOM_2  # base model code
+#set MOM2 = /print1/home4/rcp/MOM_2  # base model code
+set WORK = TEMP_DIR         # temp directory
+
+set error = false
+if (! -r poisson.F) then
+  echo '=>Error: "poisson.F" is not in this UPDATES directory'
+  set error = true
+endif
+
+if (! -r grids.F) then
+  echo '=>Error: "grids.F" is not in this UPDATES directory'
+  set error = true
+endif
+
+if (! -r size.h) then
+  echo '=>Error: "size.h" is not in this UPDATES directory'
+  set error = true
+endif
+
+if ("$error" == "true") then
+  exit
+endif
+
+
+echo "=>Grabbing sources from $MOM2"
+mkdir $WORK
+cd $WORK
+set list = (util.F iomngr.F size_check.F isleperim.F tmngr.F topog.F congrad.F isleperim.F hyper3.F relax1.F timer.F tropic.F)
+foreach file ($list)
+  cp $MOM2/$file .
+end
+cp $MOM2/*.h .
+
+cp ../poisson.F .
+cp ../grids.F .
+cp ../size.h .
+
+
+echo "=> compiling..."
+ f77 -P $OPTIONS poisson.F; f77 $COMPILER_OPT poisson.i
+# cf77 -P $OPTIONS poisson.F; cf77 -Zc -Wf"-a stack -eiz -Rbc" poisson.i
+#   segldr -S 127000 -f -indef  *.o
+
+
+echo "=> running...results are being written to results_poisson"
+a.out > ../results_poisson
+echo "Done"
+
+cd ../
+/bin/rm -r $WORK

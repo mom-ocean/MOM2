@@ -1,0 +1,38 @@
+#
+echo " "
+echo " =>executing: run_tmngr"
+echo " "
+#
+#
+# script for testing the "tmngr.F" module
+#
+
+set OPTIONS = '-Dtest_tmngr'
+
+
+set MOM2 = /home/rcp/MOM_2  # base model code
+set WORK = TEMP_DIR         # temp directory
+
+if (! -r tmngr.F) then
+  echo '=>Error: "tmngr.F" is not in this UPDATES directory'
+  exit
+endif
+
+echo "=>Grabbing sources from $MOM2"
+mkdir $WORK
+cd $WORK
+set list = (util.F stdunits.h tmngr.h switch.h calendar.h)
+foreach file ($list)
+  cp $MOM2/$file .
+end
+cp ../tmngr.F .
+
+echo "=>compiling..."
+f77 -P $OPTIONS tmngr.F; f77 tmngr.i
+ 
+echo "=> running...results are being written to results_tmngr"
+a.out > ../results_tmngr
+ 
+cd ../
+/bin/rm -r $WORK
+echo "Done"

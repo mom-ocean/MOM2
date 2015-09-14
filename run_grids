@@ -1,0 +1,50 @@
+#
+echo " "
+echo " =>executing: run_grids"
+echo " "
+#
+# script for running the "grids.F" module to generate a grid
+#
+#     options: (must choose only one of these)
+#       -Dread_my_grid    : read in your own grid definition
+#       -Dgenerate_a_grid : generate a grid based on USER INPUT
+#                           in grids.F
+#
+#     other options are possible... see grids.F for details
+#
+
+
+set OPTIONS = '-Ddrive_grids -Dgenerate_a_grid'
+echo OPTION LIST: $OPTIONS
+echo " "
+
+set MOM2 = /home/rcp/MOM_2  # base model code
+set WORK = TEMP_DIR         # temp directory
+
+if (! -r grids.F) then
+  echo '=>Error: need to have "grids.F" in this UPDATES directory'
+  echo '         copy "grids.F" to this directory and make modifications here'
+  exit
+endif
+
+echo "=>Grabbing sources from $MOM2"
+mkdir $WORK
+cd $WORK
+set list = (stdunits.h util.F iomngr.F iomngr.h)
+foreach file ($list)
+  echo $file
+  cp $MOM2/$file .
+end
+cp ../grids.F .
+
+echo "=>compiling..."
+f77 -P $OPTIONS grids.F; f77 grids.i
+
+echo "=> running...results are being written to results_grids"
+a.out > ../results_grids
+
+echo " "
+tail ../results_grids
+
+cd ../
+/bin/rm -r $WORK

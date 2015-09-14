@@ -1,0 +1,104 @@
+#   run script to prepare montlhy hellerman wind stress and
+#   oort air temperature for MOM_2
+#   author:  R.C. Pacanowski   e-mail: rcp@gfdl.gov
+#
+
+set myEXP       = TEST_CASE 
+set myWHOME     = $WHOME
+set myARCHIVE   = $ARCHIVE
+set MOMupdates  = $myWHOME/MOM_2/EXP/$myEXP/MOM_UPDATES
+set PREPupdates = $myWHOME/MOM_2/EXP/$myEXP/PREP_UPDATES
+
+set MOMpath      = $myWHOME/MOM_2
+set PREPpath     = $MOMpath/PREP_DATA
+set datainpath   = /archive/o/rcp/MOM_2/DATABASE
+set dataoutpath  = $myARCHIVE/MOM_2/EXP/$myEXP
+set printoutpath = $PREPupdates
+set WORKDIR      = $FTMPDIR
+
+""cd $WORKDIR   # change to a working directory
+/bin/rm $WORKDIR/*.[Ffh]
+
+echo " "
+echo " preparing Hellerman climatological monthly stress for MOM"
+echo " (also Oort monthly air temperature files)"
+echo " "
+
+echo " ==> getting sources for run_sbc..."
+set list = (stdunits.h coord.h grids.F size.h util.F iomngr.F iomngr.h size_check.F)
+foreach file ($list)
+  cp $MOMpath/$file .
+end
+
+/bin/cp $MOMupdates/*.[Ffh] .
+
+/bin/cp $PREPpath/sbc.F .
+
+/bin/cp $PREPupdates/*.[Ffh]  .
+
+setenv NPROC 3
+
+echo " ==> compiling ... "
+
+# USER INPUT: set OPTIONS
+
+#
+#     options: (must choose only one of these)
+#       -Dread_my_grid    : read in your own grid definition
+#       -Dgenerate_a_grid : generate a grid based on USER INPUT
+#                           in grids.F
+#     optional options:
+#
+#       -Drectangular_box : sets "kmt" to a flat bottom rectangular box
+#       -Dflat_bottom     : sets "kmt" over ocean to maximum levels (km)
+#       -Dcyclic          : sets cyclic conditons in zonal direction
+#
+set OPTIONS = '-Dmakesbc -Dcray_ymp -Dgenerate_a_grid -Dcyclic'
+echo OPTIONS = $OPTIONS
+/lib/cpp -P $OPTIONS  sbc.F sbc.i
+cf77 -Zv -o sbc sbc.i
+
+ 
+echo " ==> getting data from $datainpath "
+if (!(-r hellerman.tau && -r oorts.air)) then
+ dmget $datainpath/hellerman.tau $datainpath/oorts.air
+ /bin/cp $datainpath/hellerman.tau .
+ /bin/cp $datainpath/oorts.air .
+else
+ echo "data is assumed to be in $WORKDIR"
+endif
+
+
+# USER INPUT: choose the type of interpolation based on resolution
+
+# intrph = 1 implies MOM horizontal resolution is < Hellerman 2 deg 
+# intrph = 2 implies MOM horizontal resolution is > Hellerman 2 deg 
+# intrpo = 1 implies MOM horizontal resolution is < Oort 5 deg 
+# intrpo = 2 implies MOM horizontal resolution is > Oort 5 deg  
+  
+cat > sbc.in << NAMELIST
+ &input  name='MOM climatological S.B.C.',
+   intrph=1, intrpo=2,
+ &end
+NAMELIST
+
+/bin/rm .assign
+
+echo " ==> executing sbc ... "
+(sbc < sbc.in) > printout
+ 
+/bin/cp printout $printoutpath/sbc.prn
+echo  " ==> copied printout to $printoutpath/sbc.prn"
+
+if (! (-d $dataoutpath)) then
+  mkdir $dataoutpath
+endif
+
+/bin/cp taux.mom $dataoutpath/taux.mom
+echo  " ==> copied taux.mom to $dataoutpath/taux.mom"
+/bin/cp tauy.mom $dataoutpath/tauy.mom
+echo  " ==> copied tauy.mom to $dataoutpath/tauy.mom"
+/bin/cp airtemp.mom $dataoutpath/airtemp.mom
+echo  " ==> copied airtemp.mom to $dataoutpath/airtemp.mom"
+echo  " ==> all done "
+#

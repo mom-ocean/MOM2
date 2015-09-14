@@ -1,0 +1,74 @@
+#
+echo " "
+echo " =>executing: run_iomngr"
+echo " "
+#
+# script for testing the io manager on cray-ymp and sgi 
+#
+# the following options may also be set
+# set OPTIONS ='-Dverbose_iomngr -Ddebug_iomngr -Dio_history'
+# if executing on SGI, use -Dsgi
+# if executing on CRAY YMP, use -Dcray_ymp and -Dshow_assigns
+
+set case = 'sgi'
+#set case = 'cray'
+
+#set TEST_OPTIONS = '-Dtest_iomngr -Dverbose_iomngr -Ddebug_iomngr'
+set TEST_OPTIONS = '-Dtest_iomngr -Dprint_iomngr_description -Dverbose_iomngr -Diohistory'
+
+
+set MOM2 = /home/rcp/MOM_2  # base model code
+set WORK = TEMP_DIR         # temp directory
+
+if (! -r iomngr.F) then
+  echo '=>Error: "iomngr.F" is not in this UPDATES directory'
+  exit
+endif
+
+echo "=>Grabbing sources from $MOM2"
+mkdir $WORK
+cd $WORK
+set list = (stdunits.h iomngr.h)
+foreach file ($list)
+  cp $MOM2/$file .
+end
+cp ../iomngr.F .
+
+
+
+if ($case == 'sgi') then
+ echo '=>running iomngr test on sgi'
+ echo '  change case if running on cray-ymp'
+
+ set COMPUTER_OPTION = '-Dsgi' 
+
+ #set COMPILER_OPTIONS = "-O2 -mips2 -r8 -align64 -Olimit 2000"
+ #set COMPILER_OPTIONS = "-O2  -r8  -Olimit 2000"
+ set  COMPILER_OPTIONS = " "
+
+ set OPTIONS = " $COMPUTER_OPTION $TEST_OPTIONS "
+ echo 'OPTIONS=' $OPTIONS
+ echo "=>compiling..."
+ f77 -P $OPTIONS iomngr.F; f77 $COMPILER_OPTIONS -o sgi_a.out iomngr.i
+ echo "=> running...results are being written to results_sgi_iotest"
+ sgi_a.out > ../results_sgi_iotest
+endif
+
+
+if ($case == 'cray') then
+ echo '=>running iomngr test on cray ymp'
+ echo '  change case if running on sgi'
+
+ /bin/rm .assign
+
+ set COMPUTER_OPTION = '-Dcray_ymp' 
+
+ set OPTIONS = " $COMPUTER_OPTION $TEST_OPTIONS "
+ cf77 -Zv -P $OPTIONS iomngr.F; cf77 -Zv iomngr.i
+ echo "=> running...results are being written to results_cray_iotest"
+ a.out > ../results_cray_iotest
+endif
+
+cd ../
+/bin/rm -r $WORK
+echo "Done"
